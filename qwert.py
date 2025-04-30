@@ -1,49 +1,69 @@
 import streamlit as st
 from openai import OpenAI
 
-# 제목
-st.title("🧠 GPT-4.1-mini 채팅")
+# 페이지 설정
+st.set_page_config(page_title="ChatGPT Mini", page_icon="💬", layout="wide")
 
-# API Key 입력 받기
-api_key = st.text_input("🔐 OpenAI API Key", type="password")
+st.markdown("""
+    <style>
+    .message {
+        padding: 0.75rem;
+        border-radius: 10px;
+        margin: 0.5rem 0;
+        max-width: 80%;
+    }
+    .user {
+        background-color: #DCF8C6;
+        text-align: right;
+        margin-left: auto;
+    }
+    .assistant {
+        background-color: #F1F0F0;
+        text-align: left;
+        margin-right: auto;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-# 세션 상태에 대화 메시지 리스트 초기화
+# 타이틀
+st.title("💬 GPT-4.1-mini Chat")
+
+# API Key
+api_key = st.sidebar.text_input("🔑 OpenAI API Key", type="password")
+
+# 채팅 기록 초기화
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "system", "content": "You are a helpful assistant."}
     ]
 
-# 사용자 입력 받기
-user_input = st.text_input("✍️ 질문을 입력하세요", key="input")
+# 채팅 입력창 (하단 고정 스타일)
+with st.container():
+    user_input = st.chat_input("메시지를 입력하세요...")
 
-# GPT 응답 처리
-if st.button("보내기"):
-    if not api_key:
-        st.warning("API 키를 입력해주세요.")
-    elif not user_input:
-        st.warning("질문을 입력해주세요.")
-    else:
-        try:
-            # OpenAI 클라이언트 설정
-            client = OpenAI(api_key=api_key)
+# 메시지 전송 시
+if user_input and api_key:
+    # 메시지 추가
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
-            # 사용자 메시지 추가
-            st.session_state.messages.append({"role": "user", "content": user_input})
+    # OpenAI 호출
+    try:
+        client = OpenAI(api_key=api_key)
+        response = client.responses.create(
+            model="gpt-4.1-mini",
+            input=st.session_state.messages
+        )
+        reply = response.output[0].content[0].text
+        st.session_state.messages.append({"role": "assistant", "content": reply})
 
-            # Responses API 호출
-            response = client.responses.create(
-                model="gpt-4.1-mini",
-                input=st.session_state.messages
-            )
+    except Exception as e:
+        st.error(f"에러 발생: {e}")
 
-            assistant_reply = response.output[0].content[0].text
-            st.session_state.messages.append({"role": "assistant", "content": assistant_reply})
-
-        except Exception as e:
-            st.error(f"에러 발생: {e}")
-
-# 대화 이력 출력
-st.subheader("💬 대화")
+# 대화 렌더링
 for msg in st.session_state.messages[1:]:
-    speaker = "👤 사용자" if msg["role"] == "user" else "🤖 GPT"
-    st.markdown(f"**{speaker}:** {msg['content']}")
+    role_class = "user" if msg["role"] == "user" else "assistant"
+    role_name = "You" if msg["role"] == "user" else "GPT"
+    st.markdown(
+        f'<div class="message {role_class}"><b>{role_name}</b><br>{msg["content"]}</div>',
+        unsafe_allow_html=True
+    )
